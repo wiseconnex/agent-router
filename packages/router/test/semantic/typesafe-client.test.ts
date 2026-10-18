@@ -20,7 +20,7 @@ describe("assertSafeState", () => {
     ["Slack bot token", "xoxb-123456789012-123456789012-abcdefghijklmnopqrstuvwxyzABCD"],
     ["Slack user token", "xoxp-123456789012-123456789012-abcdefghijklmnopqrstuvwxyzABCD"],
     ["AWS access-key ID", "AKIAIOSFODNN7EXAMPLE"],
-    ["Google API key", "AIzaSyA1234567890abcdefghijklmnopqrst"],
+    ["Google API key", "AIzaSyA1234567890abcdefghijklmnopqrst"], // gitleaks:allow -- synthetic assertSafeState rejection fixture, not a credential
     ["password", "password=hunter2"],
     ["cookie", "cookie: session=abc123"],
     ["private key", "-----BEGIN PRIVATE KEY-----"],

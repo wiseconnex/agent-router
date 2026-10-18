@@ -1,0 +1,12 @@
+vitest run --reporter=json (sandbox pnpm, node v22.23.1) — salidas reales:
+numTotalTestSuites(describe): 167
+numTotalTests: 519
+passed: 519 | failed: 0 | skipped: 0
+test files en disco: 64 | suites reportadas: 64
++1 suite con LOAD ERROR (0 tests ejecutados de esa suite, excluida del conteo):
+  packages/coordinator/test/worker-entry.test.ts
+  mensaje real: "Cannot find package 'better-sqlite3' imported from …/worker-entry.test.ts"
+  causa: phantom dependency — coordinator/package.json no declara better-sqlite3 (0 matches).
+  Bajo npm-hoist (lifecycle que upstream soporta) cargaría; el load error es artefacto de la
+  resolución estricta pnpm del sandbox. Baseline condicionada: grafo resuelto por semver pnpm
+  con drift dev-only (ver 03-verifier.md §Desviaciones); pins runtime idénticos al lock npm.

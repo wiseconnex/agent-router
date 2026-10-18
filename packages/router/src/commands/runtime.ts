@@ -9,6 +9,12 @@ import { collectorsForAccount as defaultCollectorsForAccount } from "../collecto
 import type { UsageCollector } from "../collectors/types.js";
 import { createLiveTypeSafeClient, type TypeSafePort } from "../semantic/typesafe-client.js";
 import {
+  assertGatewayBaseUrl,
+  createSystemOneGatewayClient,
+} from "../semantic/systemone-gateway-client.js";
+
+export const MODEL_ROUTER_SYSTEMONE_URL_ENV = "MODEL_ROUTER_SYSTEMONE_URL";
+import {
   createHerdrClient,
   createHerdrPaneClient,
   createProcessCommandAdapter,
@@ -105,6 +111,7 @@ export function resolveCredential(
 
 export interface RuntimeOverrides {
   createTypeSafeClient?: (apiKey: string) => TypeSafePort;
+  createSystemOneGateway?: (baseUrl: string) => TypeSafePort;
   createProcessAdapter?: (options?: { env?: NodeJS.ProcessEnv }) => RunCommand;
   createHerdr?: (runCommand: RunCommand) => HerdrClient;
   createHerdrPane?: (runCommand: RunCommand) => HerdrPaneClient;
@@ -187,22 +194,33 @@ export async function createDefaultRunDeps(
       usageRepo.save(snapshot);
     }
   }
-  // The configured reference (for example keychain:model-router-typesafe) works in every
-  // pane without exporting the key; TYPESAFE_API_KEY remains a fallback.
-  const apiKeyRef = config.typesafe?.apiKeyRef;
-  const apiKey =
-    resolveCredential(apiKeyRef, env, overrides.readKeychain) ??
-    resolveEnvCredential("env:TYPESAFE_API_KEY", env);
-  const createTypeSafe = overrides.createTypeSafeClient ?? createLiveTypeSafeClient;
-  const client = apiKey ? createTypeSafe(apiKey) : unavailableTypeSafe();
-  const checked = [
-    ...(apiKeyRef && apiKeyRef !== "env:TYPESAFE_API_KEY" ? [apiKeyRef] : []),
-    "TYPESAFE_API_KEY",
-  ];
-  const typesafeKeyHint = apiKey
-    ? undefined
-    : `No TypeSafe API key found (checked ${checked.join(" and ")}). Store it once with: ` +
-      'security add-generic-password -a "$USER" -s model-router-typesafe -w';
+  const systemOneGatewayUrl = env[MODEL_ROUTER_SYSTEMONE_URL_ENV]?.trim();
+  let client: TypeSafePort;
+  let typesafeKeyHint: string | undefined;
+  if (systemOneGatewayUrl) {
+    const gatewayBaseUrl = assertGatewayBaseUrl(systemOneGatewayUrl);
+    const createGateway = overrides.createSystemOneGateway ?? ((url: string) =>
+      createSystemOneGatewayClient({ baseUrl: url, fetchImpl: overrides.fetchImpl }));
+    client = createGateway(gatewayBaseUrl);
+    typesafeKeyHint = undefined;
+  } else {
+    // The configured reference (for example keychain:model-router-typesafe) works in every
+    // pane without exporting the key; TYPESAFE_API_KEY remains a fallback.
+    const apiKeyRef = config.typesafe?.apiKeyRef;
+    const apiKey =
+      resolveCredential(apiKeyRef, env, overrides.readKeychain) ??
+      resolveEnvCredential("env:TYPESAFE_API_KEY", env);
+    const createTypeSafe = overrides.createTypeSafeClient ?? createLiveTypeSafeClient;
+    client = apiKey ? createTypeSafe(apiKey) : unavailableTypeSafe();
+    const checked = [
+      ...(apiKeyRef && apiKeyRef !== "env:TYPESAFE_API_KEY" ? [apiKeyRef] : []),
+      "TYPESAFE_API_KEY",
+    ];
+    typesafeKeyHint = apiKey
+      ? undefined
+      : `No TypeSafe API key found (checked ${checked.join(" and ")}). Store it once with: ` +
+        'security add-generic-password -a "$USER" -s model-router-typesafe -w';
+  }
   let herdr: HerdrClient | undefined;
   let herdrPane: HerdrPaneClient | undefined;
   if (isHerdrEnv(env)) {

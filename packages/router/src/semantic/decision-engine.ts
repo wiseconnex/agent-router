@@ -148,7 +148,9 @@ export async function decideRoute(input: DecideRouteInput): Promise<RouteDecisio
     candidates: input.candidates.map((candidate) => ({
       opaqueId: candidate.opaqueId,
       agent: candidate.agent,
-      projectedRemainingRatio: candidate.projectedRemainingRatio,
+      ...(candidate.projectedRemainingRatio !== undefined
+        ? { projectedRemainingRatio: candidate.projectedRemainingRatio }
+        : {}),
       capabilities: candidate.capabilities,
       supportedEfforts: [...candidate.supportedEfforts],
     })),

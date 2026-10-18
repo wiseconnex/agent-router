@@ -6,7 +6,8 @@ export interface SemanticCandidate {
   agent: AgentId;
   modelId: string;
   supportedEfforts: readonly ReasoningEffort[];
-  projectedRemainingRatio: number;
+  /** Omitted when the orchestrator did not measure quota; never invent a default. */
+  projectedRemainingRatio?: number;
   capabilities: {
     planning: number;
     coding: number;

@@ -6,7 +6,9 @@ export function routeQuestion(candidates: SemanticCandidate[]) {
   for (const candidate of candidates) {
     criteria[candidate.opaqueId] = {
       agent: candidate.agent,
-      projectedRemainingRatio: candidate.projectedRemainingRatio,
+      ...(candidate.projectedRemainingRatio !== undefined
+        ? { projectedRemainingRatio: candidate.projectedRemainingRatio }
+        : {}),
       capabilities: candidate.capabilities,
       supportedEfforts: [...candidate.supportedEfforts],
     };

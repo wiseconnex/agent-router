@@ -1,0 +1,173 @@
+{
+  "repository": "nidhi-singh02/agent-router",
+  "pinned_commit": "fb24d06a62fb33a92c7836b4920ae9f4b1216c63",
+  "assessment_date": "2026-10-09T21:18:50-06:00",
+  "scout_role": "Gemini 3.8 Flash (High)",
+  "claims": [
+    {
+      "id": "CLM-001",
+      "category": "local_first",
+      "claim": "Local-first: configuración, snapshots de uso, decisiones e historial de sesión permanecen en la máquina local.",
+      "claim_source": "README.md:27-28",
+      "code_reference": {
+        "file": "packages/router/src/commands/run.ts",
+        "lines": "329-333",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/commands/run.ts#L329-L333"
+      },
+      "code_reference_engine": {
+        "file": "packages/router/src/semantic/decision-engine.ts",
+        "lines": "91, 164, 200",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/semantic/decision-engine.ts#L91"
+      },
+      "verification_status": "confirmed_divergence",
+      "reality": "No funciona offline. Cada ejecución de ruteo realiza 3 llamadas consecutivas a la API externa de TypeSafe (POST https://api.typesafe.ai/v1/systemone). Si falta la clave o la red falla, la CLI aborta con código 2 (typesafe-unavailable).",
+      "impact": "Dependencia externa obligatoria en SaaS propietario de inferencia. La afirmación de 'local-first' es inexacta en el motor de decisión."
+    },
+    {
+      "id": "CLM-002",
+      "category": "dry_run_privacy",
+      "claim": "Dry run es una simulación local sin efectos secundarios.",
+      "claim_source": "README.md:180, 186-187",
+      "code_reference": {
+        "file": "packages/router/src/commands/run.ts",
+        "lines": "329, 404-421, 550-565",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/commands/run.ts#L329"
+      },
+      "verification_status": "confirmed_divergence",
+      "reality": "router run --dry-run ejecuta decideRoute() ANTES de verificar el flag dryRun. Transmite el texto de la tarea a TypeSafe por red. Además, en dry-run estándar (sin --worktree) crea y libera una reserva en SQLite local.",
+      "impact": "Filtración de prompts por red en ejecuciones supuestamente inactivas/seguras de prueba."
+    },
+    {
+      "id": "CLM-003",
+      "category": "offline_fallback",
+      "claim": "Existe fallback determinista si TypeSafe no está disponible.",
+      "claim_source": "Código fuente interno (packages/router/src/semantic/fallback.ts)",
+      "code_reference": {
+        "file": "packages/router/src/commands/run.ts",
+        "lines": "364-375",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/commands/run.ts#L364-L375"
+      },
+      "verification_status": "confirmed_divergence",
+      "reality": "El fallback determinista (deterministicFallback) es código muerto (dead code). run.ts descarta explícitamente el resultado de fallback y retorna código de salida 2 (typesafe-unavailable).",
+      "impact": "Cero resiliencia ante caídas de la API de TypeSafe."
+    },
+    {
+      "id": "CLM-004",
+      "category": "quota_aware",
+      "claim": "Quota-aware: enruta evitando suscripciones agotadas o bajo reserva.",
+      "claim_source": "README.md:25, 218-230",
+      "code_reference": {
+        "file": "packages/router/src/policy/eligibility.ts",
+        "lines": "35-56",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/policy/eligibility.ts#L35-L56"
+      },
+      "verification_status": "confirmed_divergence",
+      "reality": "Para cuentas personales (ownership: personal), la verificación de cuota es un bypass total: si la cuota está en 0%, si está vencida (stale), o si el archivo no existe (unknown), retorna eligible: true con proyección 1.0. Solo las cuentas compartidas (shared) aplican la reserva del 40% y exigen cuota conocida.",
+      "impact": "Las cuentas personales pueden fallar en runtime si la cuota real está agotada."
+    },
+    {
+      "id": "CLM-005",
+      "category": "collectors",
+      "claim": "El router recolecta cuotas de proveedores mediante CLI oficial o archivos de sesión local.",
+      "claim_source": "README.md:218-237",
+      "code_reference": {
+        "file": "packages/router/src/collectors/cursor/cursor-statusline-collector.ts",
+        "lines": "10-22, 60-70",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/collectors/cursor/cursor-statusline-collector.ts#L10-L22"
+      },
+      "code_reference_parser": {
+        "file": "packages/router/src/collectors/anthropic/claude-parser.ts",
+        "lines": "31-46",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/collectors/anthropic/claude-parser.ts#L31-L46"
+      },
+      "verification_status": "confirmed_divergence",
+      "reality": "El router NO extrae cuotas por sí mismo. Depende de scripts externos que el usuario configure en su statusline para escribir JSON en ~/.cursor/, ~/.claude/ o ~/.codex/. Si el archivo tiene más de 15 minutos de antigüedad, se descarta. Los recolectores 'official-cli' usan comandos hipotéticos (agent status --format json, claude auth status --json) y fixtures con valores hardcodeados de fecha 2026-09-17.",
+      "impact": "La recolección de cuota real es frágil o inexistente sin infraestructura de statusline externa."
+    },
+    {
+      "id": "CLM-006",
+      "category": "privacy_data_leakage",
+      "claim": "Privacidad y exclusión de datos sensibles antes de llamar a TypeSafe.",
+      "claim_source": "docs/privacy.md:3, README.md:34-36",
+      "code_reference": {
+        "file": "packages/router/src/semantic/typesafe-client.ts",
+        "lines": "29-45",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/semantic/typesafe-client.ts#L29-L45"
+      },
+      "verification_status": "confirmed_match",
+      "reality": "assertSafeState() contiene regexes para detectar tokens de API conocidos (sk-, Bearer, github_pat, AKIA, etc.). Si detecta un patrón, lanza excepción. Sin embargo, no filtra texto narrativo, PII, secretos comerciales, nombres de archivos dentro del prompt ni fragmentos de código.",
+      "impact": "Cualquier información confidencial en el prompt de la tarea es enviada en texto claro a TypeSafe."
+    },
+    {
+      "id": "CLM-007",
+      "category": "privacy_storage",
+      "claim": "Los datos de sesión y auditoría redactan tokens de seguridad.",
+      "claim_source": "docs/privacy.md:18, 20",
+      "code_reference": {
+        "file": "packages/router/src/collectors/normalizer.ts",
+        "lines": "3-5",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/collectors/normalizer.ts#L3-L5"
+      },
+      "code_reference_db": {
+        "file": "packages/router/src/store/database.ts",
+        "lines": "34-45",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/store/database.ts#L34-L45"
+      },
+      "verification_status": "confirmed_match",
+      "reality": "redactCollectorText solo reemplaza tokens que coinciden con sk-[A-Za-z0-9_-]+ por [REDACTED]. El resto de la tarea y handoff se almacena en SQLite en JSON plano. El archivo SQLite se asegura con chmod 0600 en sistemas UNIX.",
+      "impact": "El texto del prompt y handoff queda persistido localmente sin cifrado en reposo, sólo protegido por permisos de sistema operativo."
+    },
+    {
+      "id": "CLM-008",
+      "category": "autonomous_execution",
+      "claim": "Routing autónomo y adaptativo de agentes.",
+      "claim_source": "README.md:5-15",
+      "code_reference": {
+        "file": "packages/router/src/launch/herdr-launcher.ts",
+        "lines": "82-96, 122-170",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/launch/herdr-launcher.ts#L82-L96"
+      },
+      "code_reference_levels": {
+        "file": "packages/router/src/live-effort/levels.ts",
+        "lines": "51-53",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/live-effort/levels.ts#L51-L53"
+      },
+      "verification_status": "confirmed_divergence",
+      "reality": "El router es un comando síncrono disparado manualmente o vía hook/plugin en Herdr. No es un orquestador continuo autónomo. Los niveles max y ultra NO pueden seleccionarse autónomamente: exigen que el usuario haya escrito la palabra 'ultra' en el prompt de la tarea inicial.",
+      "impact": "Autonomía acotada a una sola fase por comando; elevación de esfuerzo top-tier controlada por palabra clave estricta."
+    },
+    {
+      "id": "CLM-009",
+      "category": "handoff_context",
+      "claim": "Handoff estructurado y continuidad de fase.",
+      "claim_source": "README.md:281-305",
+      "code_reference": {
+        "file": "packages/router/src/commands/run.ts",
+        "lines": "473-486, 550-562",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/commands/run.ts#L473-L486"
+      },
+      "verification_status": "confirmed_divergence",
+      "reality": "Al cambiar de agente o abrir nuevo pane, no se transfiere el historial ni la memoria conversacional. El nuevo agente solo recibe un prompt sintético que incluye el ID de sesión anterior y el path del worktree o archivo generado.",
+      "impact": "Pérdida de contexto en tránsito si el agente anterior no persistió un plan en disco."
+    },
+    {
+      "id": "CLM-010",
+      "category": "live_effort_switching",
+      "claim": "Cambio de esfuerzo en vivo dentro de sesiones activas de Opus 5.5 y GPT-6 Astra.",
+      "claim_source": "README.md:362-412",
+      "code_reference": {
+        "file": "packages/router/src/live-effort/switcher.ts",
+        "lines": "1-60",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/live-effort/switcher.ts"
+      },
+      "code_reference_pane_text": {
+        "file": "packages/router/src/live-effort/pane-text.ts",
+        "lines": "1-50",
+        "url": "https://github.com/nidhi-singh02/agent-router/blob/fb24d06a62fb33a92c7836b4920ae9f4b1216c63/packages/router/src/live-effort/pane-text.ts"
+      },
+      "verification_status": "confirmed_match",
+      "reality": "Implementado mediante inyección de teclas en la TUI de Herdr y lectura del texto de pantalla de la terminal. Si la TUI muestra diálogos inesperados, Plan mode en Codex, o cambios no reconocidos, el switch se detiene de forma cerrada (fail-closed) para evitar sobreescribir el input del usuario.",
+      "impact": "Mecanismo frágil acoplado a versiones exactas de CLI (Claude Code 2.1.283, codex-cli 0.156.1, Herdr 0.9.0)."
+    }
+  ]
+}

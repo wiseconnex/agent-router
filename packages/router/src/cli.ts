@@ -3,6 +3,7 @@ import { realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
+import { executeAdvise } from "./commands/advise.js";
 import { executeRun, type RunDeps } from "./commands/run.js";
 import { executeEffort, type EffortDeps, type EffortRequest } from "./commands/effort.js";
 import { ReasoningEffortSchema } from "./domain/model-profile.js";
@@ -45,6 +46,7 @@ export interface CliOptions {
   createRunDeps?: typeof createDefaultRunDeps;
   effort?: typeof executeEffort;
   effortDeps?: EffortDeps;
+  advise?: typeof executeAdvise;
 }
 
 function effortDepsFrom(deps: RunDeps): EffortDeps {
@@ -110,6 +112,23 @@ export function createProgram(options: CliOptions = {}): Command & { exitCode?: 
     },
   });
   program.exitOverride();
+  program
+    .command("advise")
+    .description(
+      "Recommend harness/model/effort after ODD delegation is decided (no agent launch)",
+    )
+    .requiredOption("--request <path>", "Machine-readable advisory request JSON file")
+    .option("--json", "Emit JSON only", true)
+    .action(async (flags: { request: string; json?: boolean }) => {
+      try {
+        const result = await (options.advise ?? executeAdvise)(flags.request, { env });
+        stdout.write(result.output);
+        program.exitCode = result.code;
+      } catch (error) {
+        stderr.write(`${formatError(error)}\n`);
+        program.exitCode = 1;
+      }
+    });
   program
     .command("run")
     .argument("<task>")

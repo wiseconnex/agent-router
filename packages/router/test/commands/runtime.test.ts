@@ -59,6 +59,31 @@ function stubHerdr(): HerdrClient {
 }
 
 describe("createDefaultRunDeps", () => {
+  it("uses the SystemOne gateway without reading TypeSafe credentials when MODEL_ROUTER_SYSTEMONE_URL is set", async () => {
+    const gateway = stubTypeSafe();
+    const createSystemOneGateway = vi.fn(() => gateway);
+    const createTypeSafeClient = vi.fn(stubTypeSafe);
+    const readKeychain = vi.fn(() => "ts_should_not_be_used");
+    const deps = await createDefaultRunDeps(
+      {
+        MODEL_ROUTER_HOME: homeWithAccount(),
+        MODEL_ROUTER_SYSTEMONE_URL: "http://127.0.0.1:8077",
+        TYPESAFE_API_KEY: "ts_env_dummy",
+      },
+      {
+        createSystemOneGateway,
+        createTypeSafeClient,
+        readKeychain,
+        collectorsForAccount: () => idleCollectors,
+      },
+    );
+    expect(createSystemOneGateway).toHaveBeenCalledWith("http://127.0.0.1:8077");
+    expect(createTypeSafeClient).not.toHaveBeenCalled();
+    expect(readKeychain).not.toHaveBeenCalled();
+    expect(deps.client).toBe(gateway);
+    expect(deps.typesafeKeyHint).toBeUndefined();
+  });
+
   it("keeps TypeSafe unavailable when TYPESAFE_API_KEY is absent", async () => {
     const createTypeSafeClient = vi.fn(stubTypeSafe);
     const deps = await createDefaultRunDeps(
