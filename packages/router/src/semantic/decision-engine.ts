@@ -4,7 +4,7 @@ import type { WorkflowPhase } from "../domain/session.js";
 import type { EnrichmentShapes } from "../enrich/buckets.js";
 import type { SemanticCandidate } from "./candidate.js";
 import { cacheValueQuestion } from "./cache-assessor.js";
-import { effortQuestion } from "./effort-selector.js";
+import { allowedEfforts, effortQuestion } from "./effort-selector.js";
 import { isTopTier } from "../live-effort/levels.js";
 import { deterministicFallback } from "./fallback.js";
 import { phaseQuestion } from "./phase-classifier.js";
@@ -197,22 +197,9 @@ export async function decideRoute(input: DecideRouteInput): Promise<RouteDecisio
   if (!selected) {
     return { status: "invalid-choice" };
   }
-  let effortResponse;
-  try {
-    effortResponse = await input.client.systemOne({
-      state: {
-        task: input.task,
-        family,
-        phase,
-        complexity: classification.answers.complexity.score,
-        creativity: classification.answers.creativity.score,
-        ...(input.enrichment ? { enrichment: input.enrichment } : {}),
-      },
-      questions: {
-        effort: effortQuestion([...selected.supportedEfforts], input.topTierUnlocked),
-      },
-    });
-  } catch {
+  const allowed = allowedEfforts(selected.supportedEfforts, input.topTierUnlocked);
+  let effort: ReasoningEffort;
+  if (allowed.length === 0) {
     return {
       status: "typesafe-unavailable",
       fallback: deterministicFallback({
@@ -221,9 +208,49 @@ export async function decideRoute(input: DecideRouteInput): Promise<RouteDecisio
       }),
     };
   }
-  const effort = effortResponse.answers.effort.choice as ReasoningEffort;
-  if (isTopTier(effort) && !input.topTierUnlocked) {
-    return { status: "invalid-choice" };
+  if (allowed.length === 1) {
+    // Single candidate effort: nothing to rank. A 1-label choice question is
+    // rejected by the SystemOne gateway contract (min two criteria labels).
+    const [onlyEffort] = allowed;
+    if (!onlyEffort) {
+      return {
+        status: "typesafe-unavailable",
+        fallback: deterministicFallback({
+          family,
+          candidates: input.candidates,
+        }),
+      };
+    }
+    effort = onlyEffort;
+  } else {
+    let effortResponse;
+    try {
+      effortResponse = await input.client.systemOne({
+        state: {
+          task: input.task,
+          family,
+          phase,
+          complexity: classification.answers.complexity.score,
+          creativity: classification.answers.creativity.score,
+          ...(input.enrichment ? { enrichment: input.enrichment } : {}),
+        },
+        questions: {
+          effort: effortQuestion([...selected.supportedEfforts], input.topTierUnlocked),
+        },
+      });
+    } catch {
+      return {
+        status: "typesafe-unavailable",
+        fallback: deterministicFallback({
+          family,
+          candidates: input.candidates,
+        }),
+      };
+    }
+    effort = effortResponse.answers.effort.choice as ReasoningEffort;
+    if (isTopTier(effort) && !input.topTierUnlocked) {
+      return { status: "invalid-choice" };
+    }
   }
   return {
     status: "selected",
